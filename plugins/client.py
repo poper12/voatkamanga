@@ -6,9 +6,38 @@ from typing import List, AsyncIterable
 from aiohttp import ClientSession
 from pathlib import Path
 
+from bs4 import BeautifulSoup
 from models import LastChapter
 from tools import LanguageSingleton
 
+async def check_links(link: str):
+    #print(link)
+    names = []
+    urls = []
+    i = 0
+    useless = []
+    while i > -5:
+        url = f"{link}chapter-{i}/"
+        async with ClientSession() as session:
+            async with session.get(url) as response:
+                html = await response.text()
+                bs = BeautifulSoup(html, 'html.parser')
+                container = bs.find("div", {"class" : "page-break no-gaps"})
+                n = len(useless)
+                if n > 3:
+                    break
+                if container: 
+                    urls.append(url)
+                    names.append(f"Chapter {i}")
+                    i+=1
+                elif not container:
+                    useless.append(url)
+                    i+=1
+                     
+    links = list(reversed(urls))
+    texts = list(reversed(names))
+    print(f" {len(urls)} : {len(texts)}")     
+    return texts, links
 
 @dataclass
 class MangaCard:
@@ -49,46 +78,51 @@ def clean(name, length=-1):
 
 
 class MangaClient(ClientSession, metaclass=LanguageSingleton):
-
+    
     def __init__(self, *args, name="client", **kwargs):
         if name == "client":
-            raise NotImplementedError
+            raise NotImplementedError("A unique name must be provided for the client instance.")
         super().__init__(*args, **kwargs)
         self.name = name
 
     async def get_url(self, url, *args, file_name=None, cache=False, req_content=True, method='get', data=None,
-                      **kwargs):
-        def response(): pass
-        response.status = "200"
-        if cache:
-            path = Path(f'cache/{self.name}/{file_name}')
-            os.makedirs(path.parent, exist_ok=True)
-            try:
-                with open(path, 'rb') as f:
-                    content = f.read()
-            except FileNotFoundError:
-                if method == 'get':
-                    response = await self.get(url, *args, **kwargs)
-                elif method == 'post':
-                    response = await self.post(url, data=data or {}, **kwargs)
-                else:
-                    raise ValueError
-                if str(response.status).startswith('2'):
-                    content = await response.read()
-                    with open(path, 'wb') as f:
+                      headers=None, params=None, rjson=None, **kwargs):
+        cache_path = Path(f'cache/{self.name}/{file_name}') if cache and file_name else None
+        content = None
+
+        # If caching is enabled and the cache file exists, load the content from the cache
+        if cache and cache_path and cache_path.exists():
+            with open(cache_path, 'rb') as f:
+                content = f.read()
+        else:
+            # If no cache or cache miss, perform the network request
+            response = await self._make_request(url, method, data, headers, params, *args, **kwargs)
+
+            # Check if response is successful (2xx)
+            if str(response.status).startswith('2'):
+                content = await response.read()
+                
+                # Cache the content if caching is enabled
+                if cache and cache_path:
+                    cache_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(cache_path, 'wb') as f:
                         f.write(content)
-        else:
-            if method == 'get':
-                response = await self.get(url, *args, **kwargs)
-            elif method == 'post':
-                response = await self.post(url, data=data or {}, **kwargs)
             else:
-                raise ValueError
-            content = await response.read()
-        if req_content:
-            return content
+                # Raise an error if the response is not successful
+                raise RuntimeError(f"Request failed with status code: {response.status}")
+            
+            if rjson: return await response.json()
+            elif req_content: return content
+            else: return response
+
+    async def _make_request(self, url, method, data, headers, params, *args, **kwargs):
+        """Helper method to perform GET or POST requests."""
+        if method == 'get':
+            return await self.get(url, *args, headers=headers, params=params, **kwargs)
+        elif method == 'post':
+            return await self.post(url, data=data or {}, headers=headers, params=params, **kwargs)
         else:
-            return response
+            raise ValueError("Unsupported HTTP method")
 
     async def set_pictures(self, manga_chapter: MangaChapter):
         requests_url = manga_chapter.url
