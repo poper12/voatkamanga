@@ -18,3 +18,4 @@ from .mangasee import MangaSeeClient
 from .mangadistrict import MangaDistrictClient
 from .manga18fx import Manga18fxClient
 from .omgeascans import OmgeaScansClient
+from .reaperscans import ReaperScansClient
