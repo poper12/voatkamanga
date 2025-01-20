@@ -1,4 +1,3 @@
-
 import enum
 import shutil
 from ast import arg
@@ -58,6 +57,7 @@ plugin_dicts: Dict[str, Dict[str, MangaClient]] = {
         "AsuraScans": AsuraScansClient(),
         "NineManga": NineMangaClient(),        
         "LikeManga": LikeMangaClient(),
+        "OmgeaScans": OmgeaScansClient(),
           },
     "🇪🇸 ES": {
         "MangaDex": MangaDexClient(language=("es-la", "es")),
