@@ -58,7 +58,6 @@ plugin_dicts: Dict[str, Dict[str, MangaClient]] = {
         "NineManga": NineMangaClient(),        
         "LikeManga": LikeMangaClient(),
         "OmgeaScans": OmgeaScansClient(),
-          },
         "ReaperScans": ReaperScansClient(),
           },
     "🇪🇸 ES": {
